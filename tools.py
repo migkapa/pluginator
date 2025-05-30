@@ -346,3 +346,379 @@ def check_plugin_syntax(plugin_path: str) -> str:
     except Exception as e:
         logger.exception(f"Error checking syntax for {plugin_path}")
         return f"Error: {str(e)}"
+
+@function_tool
+def test_with_playground(plugin_slug: str) -> str:
+    """Test plugin using WordPress Playground in a headless browser.
+    
+    Args:
+        plugin_slug: The plugin slug to test
+    """
+    try:
+        # Import required libraries for browser automation
+        try:
+            from selenium import webdriver
+            from selenium.webdriver.chrome.options import Options
+            from selenium.webdriver.common.by import By
+            from selenium.webdriver.support.ui import WebDriverWait
+            from selenium.webdriver.support import expected_conditions as EC
+        except ImportError:
+            return "Error: Selenium not installed. Run: pip install selenium"
+        
+        # Check if plugin exists
+        plugin_path = Path(f"./plugins/{plugin_slug}")
+        if not plugin_path.exists():
+            return f"Error: Plugin {plugin_slug} not found in ./plugins/"
+        
+        # Create a ZIP of the plugin for upload
+        import zipfile
+        import tempfile
+        
+        with tempfile.NamedTemporaryFile(suffix='.zip', delete=False) as tmp_file:
+            zip_path = tmp_file.name
+            
+        with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            for root, dirs, files in os.walk(plugin_path):
+                for file in files:
+                    file_path = os.path.join(root, file)
+                    arcname = os.path.relpath(file_path, plugin_path.parent)
+                    zipf.write(file_path, arcname)
+        
+        # Prepare the blueprint - using default configuration
+        blueprint = {
+            "landingPage": "/wp-admin/plugins.php",
+            "login": True,
+            "steps": [
+                {
+                    "step": "login",
+                    "username": "admin",
+                    "password": "password"
+                },
+                {
+                    "step": "uploadFile",
+                    "path": f"/wordpress/wp-content/uploads/{plugin_slug}.zip",
+                    "data": {
+                        "resource": "url",
+                        "url": f"file://{zip_path}"
+                    }
+                },
+                {
+                    "step": "installPlugin",
+                    "pluginData": {
+                        "resource": "url",
+                        "url": f"/wordpress/wp-content/uploads/{plugin_slug}.zip"
+                    }
+                },
+                {
+                    "step": "activatePlugin",
+                    "pluginPath": f"{plugin_slug}/{plugin_slug}.php"
+                }
+            ]
+        }
+        
+        # Convert blueprint to URL parameter
+        import urllib.parse
+        blueprint_json = json.dumps(blueprint)
+        encoded_blueprint = urllib.parse.quote(blueprint_json)
+        
+        # Launch headless browser
+        chrome_options = Options()
+        chrome_options.add_argument('--headless')
+        chrome_options.add_argument('--no-sandbox')
+        chrome_options.add_argument('--disable-dev-shm-usage')
+        
+        driver = webdriver.Chrome(options=chrome_options)
+        
+        try:
+            # Navigate to WordPress Playground with blueprint
+            playground_url = f"https://playground.wordpress.net/?blueprint={encoded_blueprint}"
+            logger.info(f"Testing {plugin_slug} in WordPress Playground...")
+            driver.get(playground_url)
+            
+            # Wait for WordPress to load
+            wait = WebDriverWait(driver, 30)
+            
+            # Check if plugin activated successfully
+            try:
+                # Wait for admin dashboard or plugin page
+                wait.until(EC.presence_of_element_located((By.ID, "wpadminbar")))
+                
+                # Navigate to plugins page if not already there
+                if "/wp-admin/plugins.php" not in driver.current_url:
+                    driver.get(driver.current_url.replace("/wp-admin/", "/wp-admin/plugins.php"))
+                
+                # Check for activation errors
+                error_elements = driver.find_elements(By.CLASS_NAME, "error")
+                if error_elements:
+                    errors = [elem.text for elem in error_elements]
+                    return f"Plugin activation failed with errors: {'; '.join(errors)}"
+                
+                # Check if plugin is in the active plugins list
+                active_plugins = driver.find_elements(By.CSS_SELECTOR, ".active[data-plugin]")
+                plugin_active = any(plugin_slug in elem.get_attribute("data-plugin") for elem in active_plugins)
+                
+                if plugin_active:
+                    logger.success(f"Plugin {plugin_slug} successfully activated in WordPress Playground")
+                    return f"Success: Plugin {plugin_slug} activated successfully in WordPress Playground"
+                else:
+                    return f"Warning: Plugin {plugin_slug} installed but may not be active"
+                    
+            except Exception as e:
+                return f"Error during activation check: {str(e)}"
+                
+        finally:
+            driver.quit()
+            # Clean up temporary ZIP file
+            try:
+                os.unlink(zip_path)
+            except:
+                pass
+                
+    except Exception as e:
+        logger.exception(f"Error testing plugin {plugin_slug} with WordPress Playground")
+        return f"Error: {str(e)}"
+
+@function_tool
+def run_plugin_check(plugin_slug: str) -> str:
+    """Run WordPress Plugin Check tool via WP-CLI in Docker.
+    
+    Args:
+        plugin_slug: The plugin slug to check
+    """
+    try:
+        # First, check if plugin-check plugin is installed
+        install_cmd = [
+            "docker-compose", "exec", "-T", "wordpress", 
+            "wp", "plugin", "install", "plugin-check", "--activate"
+        ]
+        subprocess.run(install_cmd, capture_output=True, text=True, timeout=60)
+        
+        # Run plugin check
+        cmd = [
+            "docker-compose", "exec", "-T", "wordpress",
+            "wp", "plugin", "check", plugin_slug
+        ]
+        
+        proc = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=120
+        )
+        
+        logger.info(f"Plugin check completed for {plugin_slug}")
+        return f"Plugin Check Results:\n{proc.stdout}"
+        
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Plugin check failed for {plugin_slug}")
+        return f"Plugin check failed:\nstdout: {e.stdout}\nstderr: {e.stderr}"
+    except subprocess.TimeoutExpired:
+        return f"Error: Plugin check timed out for {plugin_slug}"
+    except FileNotFoundError:
+        return "Error: docker-compose not found. Docker environment not available."
+    except Exception as e:
+        logger.exception(f"Error running plugin check for {plugin_slug}")
+        return f"Error: {str(e)}"
+
+@function_tool
+def run_phpunit_tests(plugin_slug: str) -> str:
+    """Run PHPUnit tests for the plugin if available.
+    
+    Args:
+        plugin_slug: The plugin slug to test
+    """
+    try:
+        # Check if tests directory exists
+        test_path = Path(f"./plugins/{plugin_slug}/tests")
+        if not test_path.exists():
+            # Try alternative test paths
+            alt_paths = [
+                Path(f"./plugins/{plugin_slug}/test"),
+                Path(f"./plugins/{plugin_slug}/phpunit")
+            ]
+            test_path = next((p for p in alt_paths if p.exists()), None)
+            
+            if test_path is None:
+                return f"No tests directory found for plugin {plugin_slug}"
+        
+        # Check for PHPUnit configuration
+        config_files = ["phpunit.xml", "phpunit.xml.dist", "phpunit.xml.dist"]
+        plugin_root = Path(f"./plugins/{plugin_slug}")
+        config_file = next((f for f in config_files if (plugin_root / f).exists()), None)
+        
+        # Prepare PHPUnit command
+        cmd = [
+            "docker-compose", "exec", "-T", "wordpress",
+            "bash", "-c",
+            f"cd /var/www/html/wp-content/plugins/{plugin_slug} && "
+        ]
+        
+        # Check if PHPUnit is installed
+        phpunit_check = subprocess.run(
+            ["docker-compose", "exec", "-T", "wordpress", "which", "phpunit"],
+            capture_output=True
+        )
+        
+        if phpunit_check.returncode != 0:
+            # Try to use Composer-installed PHPUnit
+            if (plugin_root / "vendor/bin/phpunit").exists():
+                cmd[-1] += "vendor/bin/phpunit"
+            else:
+                # Try to install PHPUnit via Composer
+                logger.info("PHPUnit not found, attempting to install via Composer...")
+                composer_cmd = [
+                    "docker-compose", "exec", "-T", "wordpress",
+                    "bash", "-c",
+                    f"cd /var/www/html/wp-content/plugins/{plugin_slug} && "
+                    "composer require --dev phpunit/phpunit"
+                ]
+                subprocess.run(composer_cmd, capture_output=True, timeout=120)
+                cmd[-1] += "vendor/bin/phpunit"
+        else:
+            cmd[-1] += "phpunit"
+        
+        # Add config file if found
+        if config_file:
+            cmd[-1] += f" -c {config_file}"
+        
+        # Run the tests
+        logger.info(f"Running PHPUnit tests for {plugin_slug}...")
+        proc = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=300
+        )
+        
+        if proc.returncode == 0:
+            logger.success(f"PHPUnit tests passed for {plugin_slug}")
+            return f"PHPUnit tests passed:\n{proc.stdout}"
+        else:
+            logger.error(f"PHPUnit tests failed for {plugin_slug}")
+            return f"PHPUnit tests failed:\nstdout: {proc.stdout}\nstderr: {proc.stderr}"
+            
+    except subprocess.TimeoutExpired:
+        return f"Error: PHPUnit tests timed out for {plugin_slug}"
+    except FileNotFoundError:
+        return "Error: docker-compose not found. Docker environment not available."
+    except Exception as e:
+        logger.exception(f"Error running PHPUnit tests for {plugin_slug}")
+        return f"Error: {str(e)}"
+
+@function_tool
+def generate_phpunit_bootstrap(plugin_slug: str) -> str:
+    """Generate a basic PHPUnit bootstrap file for WordPress plugin testing.
+    
+    Args:
+        plugin_slug: The plugin slug to generate bootstrap for
+    """
+    try:
+        plugin_path = Path(f"./plugins/{plugin_slug}")
+        if not plugin_path.exists():
+            return f"Error: Plugin {plugin_slug} not found"
+        
+        # Create tests directory if it doesn't exist
+        tests_dir = plugin_path / "tests"
+        tests_dir.mkdir(exist_ok=True)
+        
+        # Generate bootstrap.php
+        bootstrap_content = f"""<?php
+/**
+ * PHPUnit bootstrap file for {plugin_slug}
+ */
+
+// Define test constants
+define( 'WP_TESTS_PHPUNIT_POLYFILLS_PATH', dirname( __DIR__ ) . '/vendor/yoast/phpunit-polyfills' );
+
+// Get WordPress tests directory
+$_tests_dir = getenv( 'WP_TESTS_DIR' );
+if ( ! $_tests_dir ) {{
+    $_tests_dir = rtrim( sys_get_temp_dir(), '/\\\\' ) . '/wordpress-tests-lib';
+}}
+
+// Forward custom PHPUnit Polyfills configuration
+if ( ! file_exists( $_tests_dir . '/includes/functions.php' ) ) {{
+    echo "Could not find $_tests_dir/includes/functions.php" . PHP_EOL;
+    exit( 1 );
+}}
+
+// Give access to tests_add_filter() function
+require_once $_tests_dir . '/includes/functions.php';
+
+/**
+ * Manually load the plugin being tested
+ */
+function _manually_load_plugin() {{
+    require dirname( dirname( __FILE__ ) ) . '/{plugin_slug}.php';
+}}
+tests_add_filter( 'muplugins_loaded', '_manually_load_plugin' );
+
+// Start up the WP testing environment
+require $_tests_dir . '/includes/bootstrap.php';
+"""
+        
+        bootstrap_file = tests_dir / "bootstrap.php"
+        bootstrap_file.write_text(bootstrap_content)
+        
+        # Generate sample test file
+        sample_test_content = f"""<?php
+/**
+ * Sample test case for {plugin_slug}
+ */
+
+class SampleTest extends WP_UnitTestCase {{
+    
+    /**
+     * Test that the plugin is loaded
+     */
+    public function test_plugin_loaded() {{
+        $this->assertTrue( function_exists( 'your_plugin_function' ) );
+    }}
+    
+    /**
+     * Test plugin activation
+     */
+    public function test_plugin_activation() {{
+        // Add your activation tests here
+        $this->assertTrue( true );
+    }}
+}}
+"""
+        
+        sample_test_file = tests_dir / "test-sample.php"
+        sample_test_file.write_text(sample_test_content)
+        
+        # Generate phpunit.xml.dist
+        phpunit_config = f"""<?xml version="1.0" encoding="UTF-8"?>
+<phpunit
+    bootstrap="tests/bootstrap.php"
+    backupGlobals="false"
+    colors="true"
+    convertErrorsToExceptions="true"
+    convertNoticesToExceptions="true"
+    convertWarningsToExceptions="true"
+>
+    <testsuites>
+        <testsuite name="{plugin_slug}">
+            <directory prefix="test-" suffix=".php">./tests/</directory>
+        </testsuite>
+    </testsuites>
+    <php>
+        <const name="WP_TESTS_DOMAIN" value="{plugin_slug}.test"/>
+        <const name="WP_TESTS_EMAIL" value="admin@{plugin_slug}.test"/>
+        <const name="WP_TESTS_TITLE" value="{plugin_slug} Test"/>
+        <const name="WP_PHP_BINARY" value="php"/>
+    </php>
+</phpunit>
+"""
+        
+        phpunit_file = plugin_path / "phpunit.xml.dist"
+        phpunit_file.write_text(phpunit_config)
+        
+        logger.success(f"Generated PHPUnit test files for {plugin_slug}")
+        return f"Successfully generated PHPUnit bootstrap and configuration files in {plugin_path}"
+        
+    except Exception as e:
+        logger.exception(f"Error generating PHPUnit bootstrap for {plugin_slug}")
+        return f"Error: {str(e)}"

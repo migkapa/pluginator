@@ -16,6 +16,10 @@ asyncio>=3.4.3
 # Path handling (usually built-in, but good to specify)
 pathlib>=1.0.1
 
+# Testing tools
+selenium>=4.0.0
+webdriver-manager>=4.0.0
+
 # Dev dependencies
 black>=24.2.0
 flake8>=7.0.0

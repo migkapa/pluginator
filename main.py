@@ -130,6 +130,10 @@ Examples:
   %(prog)s -p "Create a contact form plugin"  # Direct prompt
   %(prog)s -p "SEO plugin" -v       # Verbose output
   %(prog)s --check                  # Check environment setup
+  %(prog)s -p "Plugin description" --playground  # Test with WordPress Playground
+  %(prog)s -p "Plugin description" --wp-check    # Run WordPress Plugin Check
+  %(prog)s -p "Plugin description" --phpunit     # Generate and run PHPUnit tests
+  %(prog)s -p "Plugin description" --all-tests   # Run all available tests
         """
     )
     
@@ -153,6 +157,29 @@ Examples:
         help="Maximum retry attempts on failure (default: 3)",
         type=int,
         default=3
+    )
+    
+    # Advanced testing options
+    testing_group = parser.add_argument_group('Advanced Testing Options')
+    testing_group.add_argument(
+        "--playground",
+        help="Test plugin with WordPress Playground (requires Selenium)",
+        action="store_true"
+    )
+    testing_group.add_argument(
+        "--wp-check",
+        help="Run WordPress Plugin Check (requires Docker)",
+        action="store_true"
+    )
+    testing_group.add_argument(
+        "--phpunit",
+        help="Generate and run PHPUnit tests (requires Docker)",
+        action="store_true"
+    )
+    testing_group.add_argument(
+        "--all-tests",
+        help="Run all available advanced tests",
+        action="store_true"
     )
     
     args = parser.parse_args()
@@ -217,7 +244,27 @@ Examples:
     
     # Run the agent
     try:
-        result = asyncio.run(run_agent(prompt, args.max_retries))
+        # Prepare testing options
+        testing_options = {
+            "playground": args.playground or args.all_tests,
+            "wp_check": args.wp_check or args.all_tests,
+            "phpunit": args.phpunit or args.all_tests
+        }
+        
+        # Include testing options in the prompt
+        enhanced_prompt = prompt
+        if any(testing_options.values()):
+            test_flags = []
+            if testing_options["playground"]:
+                test_flags.append("WordPress Playground testing")
+            if testing_options["wp_check"]:
+                test_flags.append("WordPress Plugin Check")
+            if testing_options["phpunit"]:
+                test_flags.append("PHPUnit tests")
+            
+            enhanced_prompt += f"\n\nPlease run the following advanced tests: {', '.join(test_flags)}"
+        
+        result = asyncio.run(run_agent(enhanced_prompt, args.max_retries))
         if result:
             logger.info("\n=== Generation Report ===")
             print(result)

@@ -13,10 +13,17 @@ from tools import (
     log_finish_writing_files,
     log_checking_compliance,
     log_testing_plugin,
-    log_planning
+    log_planning,
+    # New testing tools
+    test_with_playground,
+    run_plugin_check,
+    run_phpunit_tests,
+    generate_phpunit_bootstrap
 )
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
+
+general_agent_model = "gpt-4o"
 
 # Enhanced Pydantic models for structured inputs/outputs
 class PluginSpec(BaseModel):
@@ -76,7 +83,7 @@ plugin_spec_agent = Agent(
         "Output a complete PluginSpec object with all fields properly filled."
     ),
     output_type=PluginSpec,
-    model="gpt-4o",
+    model=general_agent_model,
     model_settings=ModelSettings(temperature=0.3)
 )
 
@@ -86,8 +93,10 @@ file_generator_agent = Agent(
     instructions=(
         "You are an expert WordPress plugin developer who creates production-ready, well-structured plugins. "
         "Generate a complete WordPress plugin implementing ALL features specified in PluginSpec.\n\n"
+        "IMPORTANT: All file paths must be relative to the plugin root directory WITHOUT including the plugin slug directory itself.\n"
+        "For example, use 'plugin-name.php' NOT 'plugin-name/plugin-name.php'\n\n"
         "Required deliverables:\n"
-        "1. **Main Plugin File** (`<slug>/<slug>.php`):\n"
+        "1. **Main Plugin File** (`<slug>.php`):\n"
         "   - Complete plugin header with all metadata\n"
         "   - Security check: `if (!defined('ABSPATH')) exit;`\n"
         "   - Plugin class using namespace or unique prefix\n"
@@ -115,7 +124,7 @@ file_generator_agent = Agent(
         "Output ONLY a JSON array of PluginFile objects, no explanations."
     ),
     output_type=List[PluginFile],
-    model="gpt-4o",
+    model=general_agent_model,
     model_settings=ModelSettings(temperature=0.2)
 )
 
@@ -155,7 +164,7 @@ compliance_agent = Agent(
         "Include a summary count of issues by severity."
     ),
     output_type=ComplianceReport,
-    model="gpt-4o",
+    model=general_agent_model,
     model_settings=ModelSettings(temperature=0.1)
 )
 
@@ -165,6 +174,8 @@ testing_agent = Agent(
     instructions=(
         "You are a WordPress QA engineer who tests plugins for functionality and compatibility. "
         "Analyze the plugin files to predict activation behavior and identify potential issues.\n\n"
+        "IMPORTANT: Focus on static analysis and syntax checking. Do NOT attempt to actually activate the plugin.\n"
+        "Testing should complete quickly without getting stuck in loops.\n\n"
         "Testing Steps:\n"
         "1. **Syntax Validation**:\n"
         "   - Check PHP syntax in all .php files\n"
@@ -175,24 +186,21 @@ testing_agent = Agent(
         "   - WordPress version compatibility\n"
         "   - External library dependencies\n"
         "   - Required PHP extensions\n\n"
-        "3. **Activation Simulation**:\n"
-        "   - Check for fatal errors on activation\n"
-        "   - Database table creation issues\n"
-        "   - File/directory permission requirements\n"
-        "   - Hook conflicts\n\n"
-        "4. **Runtime Analysis**:\n"
-        "   - Memory usage concerns\n"
-        "   - Potential timeout issues\n"
-        "   - Error handling adequacy\n\n"
-        "5. **Performance Considerations**:\n"
-        "   - Database query efficiency\n"
-        "   - Asset loading optimization\n"
-        "   - Caching implementation\n\n"
-        "Set activated=False if any fatal errors would occur.\n"
-        "Include all errors, warnings, and performance notes in the report."
+        "3. **Activation Prediction** (static analysis only):\n"
+        "   - Check for common fatal error patterns\n"
+        "   - Missing required files\n"
+        "   - Invalid function/class definitions\n"
+        "   - Potential conflicts\n\n"
+        "4. **Code Quality**:\n"
+        "   - Error handling adequacy\n"
+        "   - Memory usage patterns\n"
+        "   - Performance considerations\n\n"
+        "Set activated=True if no fatal errors are detected in static analysis.\n"
+        "Include all errors, warnings, and performance notes in the report.\n"
+        "Complete your analysis within 5 turns maximum."
     ),
     output_type=TestReport,
-    model="gpt-4o",
+    model=general_agent_model,
     model_settings=ModelSettings(temperature=0.1)
 )
 
@@ -202,37 +210,69 @@ plugin_manager_agent = Agent(
     instructions=(
         "You are the Plugin Manager orchestrating the WordPress plugin creation workflow. "
         "Guide the process professionally and ensure high-quality output.\n\n"
+        "CRITICAL: When writing files, ALWAYS prepend './plugins/<slug>/' to the file paths from the generator.\n"
+        "For example, if generator provides 'plugin-name.php', write to './plugins/plugin-name/plugin-name.php'\n\n"
+        "IMPORTANT: Provide detailed progress updates throughout the process. After each major step, "
+        "summarize what was accomplished and what's coming next.\n\n"
         "Workflow Steps:\n"
         "1. **Planning Phase**:\n"
         "   - Call log_planning to indicate planning\n"
-        "   - Analyze user requirements\n\n"
+        "   - Analyze user requirements\n"
+        "   - If user mentions specific tests (WordPress Playground, Plugin Check, PHPUnit), note them for later\n"
+        "   - Print: 'Analyzing requirements and planning plugin structure...'\n\n"
         "2. **Specification Collection**:\n"
         "   - Call collect_plugin_spec to gather detailed requirements\n"
-        "   - Ensure spec is complete and valid\n\n"
+        "   - Ensure spec is complete and valid\n"
+        "   - Store the slug for later use\n"
+        "   - Print details like: 'Plugin Name: [name]', 'Slug: [slug]', 'Features: [list features]'\n\n"
         "3. **Code Generation**:\n"
+        "   - Print: 'Generating plugin files...'\n"
         "   - Call generate_plugin_files with the PluginSpec\n"
-        "   - Review generated files for completeness\n\n"
+        "   - Review generated files for completeness\n"
+        "   - Print: 'Generated [X] files including main plugin file, readme, and supporting files'\n\n"
         "4. **File Writing**:\n"
         "   - Call log_start_writing_files\n"
         "   - Create plugin directory: ensure_directory('./plugins/<slug>')\n"
-        "   - Write each file using write_file\n"
-        "   - Call log_finish_writing_files\n\n"
+        "   - For EACH file from generator:\n"
+        "     * Prepend './plugins/<slug>/' to the file path\n"
+        "     * Call write_file with the full path\n"
+        "     * Print: 'Writing [filename]...'\n"
+        "   - Call log_finish_writing_files\n"
+        "   - Print: 'All files written to ./plugins/<slug>/'\n\n"
         "5. **Compliance Checking**:\n"
         "   - Call log_checking_compliance\n"
-        "   - Read written files if needed for verification\n"
-        "   - Call check_compliance with file list\n"
-        "   - Check PHP syntax using check_plugin_syntax for main file\n\n"
+        "   - Print: 'Running WordPress coding standards checks...'\n"
+        "   - Pass the list of generated files to check_compliance\n"
+        "   - Check PHP syntax using check_plugin_syntax for './plugins/<slug>/<slug>.php'\n"
+        "   - Print summary: 'Found X errors, Y warnings, Z suggestions'\n\n"
         "6. **Testing Phase**:\n"
         "   - Call log_testing_plugin\n"
-        "   - Call test_plugin with file list\n"
-        "   - If Docker available, attempt real activation\n\n"
+        "   - Always call test_plugin with file list for basic testing\n"
+        "   - Print: 'Running static code analysis...'\n"
+        "   - Check if user requested specific advanced tests:\n"
+        "     * If 'WordPress Playground' mentioned:\n"
+        "       - Print: 'Testing with WordPress Playground...'\n"
+        "       - Use test_with_playground\n"
+        "     * If 'Plugin Check' mentioned:\n"
+        "       - Print: 'Running WordPress Plugin Check...'\n"
+        "       - Use run_plugin_check\n"
+        "     * If 'PHPUnit' mentioned:\n"
+        "       - Print: 'Setting up PHPUnit tests...'\n"
+        "       - Use generate_phpunit_bootstrap\n"
+        "       - Print: 'Running PHPUnit tests...'\n"
+        "       - Use run_phpunit_tests\n"
+        "   - If Docker not available for requested tests, note in report\n\n"
         "7. **Final Report**:\n"
         "   - Summarize the entire process\n"
+        "   - Report plugin location: './plugins/<slug>/'\n"
+        "   - List all tests that were run and their results\n"
         "   - Highlight successes and any issues\n"
+        "   - If advanced tests were skipped due to missing dependencies, provide instructions\n"
         "   - Provide next steps for the user\n\n"
-        "Maintain a professional tone and provide clear, actionable feedback."
+        "Complete the entire workflow efficiently without getting stuck in loops.\n"
+        "If any step fails after 2 attempts, move to the next step and report the issue."
     ),
-    model="gpt-4o",
+    model=general_agent_model,
     model_settings=ModelSettings(temperature=0.1),
     tools=[
         # Logging tools
@@ -269,5 +309,10 @@ plugin_manager_agent = Agent(
         docker_compose_up,
         activate_plugin,
         list_plugins,
+        # New testing tools
+        test_with_playground,
+        run_plugin_check,
+        run_phpunit_tests,
+        generate_phpunit_bootstrap,
     ]
 )

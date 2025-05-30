@@ -96,12 +96,82 @@ python main.py --check
 python main.py -p "Custom post type plugin" --max-retries 5
 ```
 
+### Advanced Testing Options
+
+The generator supports several advanced testing methods to ensure your plugin works correctly:
+
+```bash
+# Test with WordPress Playground (requires Selenium)
+python main.py -p "Your plugin description" --playground
+
+# Run WordPress Plugin Check (requires Docker)
+python main.py -p "Your plugin description" --wp-check
+
+# Generate and run PHPUnit tests (requires Docker)
+python main.py -p "Your plugin description" --phpunit
+
+# Run all available tests
+python main.py -p "Your plugin description" --all-tests
+```
+
 ### Command Line Options
 
+#### Basic Options
 - `-p, --prompt`: Plugin description (skip interactive prompt)
 - `-v, --verbose`: Enable verbose output with detailed logging
 - `--check`: Check environment setup and exit
 - `--max-retries`: Maximum retry attempts on failure (default: 3)
+
+#### Advanced Testing Options
+- `--playground`: Test plugin with WordPress Playground in a headless browser
+- `--wp-check`: Run the official WordPress Plugin Check tool
+- `--phpunit`: Generate PHPUnit test bootstrap and run tests
+- `--all-tests`: Run all available advanced tests
+
+## Testing Methods
+
+### 1. Basic Testing (Always Run)
+- **PHP Syntax Check**: Validates PHP syntax using `php -l`
+- **Static Code Analysis**: Analyzes code for potential issues without execution
+
+### 2. WordPress Playground Testing
+Tests your plugin in a real WordPress environment using a headless browser.
+
+**Requirements:**
+- Selenium: `pip install selenium webdriver-manager`
+- Chrome or Chromium browser
+
+**What it does:**
+- Creates a ZIP of your plugin
+- Uploads and activates it in WordPress Playground
+- Verifies successful activation
+- Reports any activation errors
+
+### 3. WordPress Plugin Check
+Runs the official WordPress Plugin Check tool to ensure compliance with WordPress guidelines.
+
+**Requirements:**
+- Docker and Docker Compose
+- Running: `docker-compose up -d`
+
+**What it checks:**
+- WordPress coding standards
+- Security best practices
+- Performance optimizations
+- Accessibility requirements
+
+### 4. PHPUnit Testing
+Generates and runs unit tests for your plugin.
+
+**Requirements:**
+- Docker and Docker Compose
+- Running: `docker-compose up -d`
+
+**What it does:**
+- Generates PHPUnit bootstrap and configuration
+- Creates sample test files
+- Runs the test suite
+- Reports test results
 
 ## Agent Workflow
 
@@ -128,6 +198,12 @@ python main.py -p "Custom post type plugin" --max-retries 5
 - `list_plugins`: Enhanced plugin listing with JSON output
 - `check_plugin_syntax`: PHP syntax validation
 
+### WordPress Testing Tools
+- `test_with_playground`: Test plugins using WordPress Playground in a headless browser
+- `run_plugin_check`: Run WordPress Plugin Check tool via WP-CLI
+- `run_phpunit_tests`: Execute PHPUnit tests for plugins
+- `generate_phpunit_bootstrap`: Generate PHPUnit test configuration
+
 ## Examples
 
 ### Basic Contact Form Plugin
@@ -136,17 +212,30 @@ python main.py -p "Custom post type plugin" --max-retries 5
 python main.py -p "Create a simple contact form plugin with spam protection"
 ```
 
-### Advanced Custom Post Type
+### Advanced Custom Post Type with Full Testing
 
 ```bash
-python main.py -p "Create a plugin for managing team members with custom post type, taxonomies, and Gutenberg blocks" -v
+# With all tests enabled
+python main.py -p "Create a plugin for managing team members with custom post type, taxonomies, and Gutenberg blocks" --all-tests
 ```
 
-### WooCommerce Extension
+### WooCommerce Extension with Specific Tests
 
 ```bash
-python main.py -p "Create a WooCommerce extension that adds custom product fields and displays them on the frontend"
+# Only WordPress Playground and Plugin Check
+python main.py -p "Create a WooCommerce extension that adds custom product fields" --playground --wp-check
 ```
+
+## Enhanced Progress Feedback
+
+The generator now provides detailed progress updates during plugin creation:
+
+1. **Planning Phase**: Shows requirements analysis
+2. **Specification Details**: Displays plugin name, slug, and features
+3. **File Generation**: Reports number of files created
+4. **Writing Progress**: Shows each file as it's written
+5. **Compliance Summary**: Reports errors, warnings, and suggestions
+6. **Testing Status**: Shows which tests are running and their results
 
 ## Troubleshooting
 
@@ -188,8 +277,49 @@ pluginator/
 ├── plugin_agents.py     # Multi-agent definitions
 ├── tools.py            # Enhanced tool implementations
 ├── requirements.txt    # Python dependencies
-├── docker-compose.yml  # WordPress test environment
+├── docker-compose.yml  # WordPress test environment with WP-CLI & PHPUnit
 └── plugins/           # Generated plugins directory
+```
+
+### Enhanced Docker Environment
+
+The `docker-compose.yml` now includes:
+- **WP-CLI**: Pre-installed WordPress command-line interface
+- **PHPUnit**: Unit testing framework for WordPress plugins
+- **Composer**: PHP dependency management
+- **PHPMyAdmin**: Optional database management interface (port 8080)
+- **Debug Mode**: WordPress debug logging enabled
+
+### Testing Generated Plugins
+
+#### 1. WordPress Playground Testing
+
+Test your plugin in a browser-based WordPress environment:
+
+```bash
+# The generator can automatically test with WordPress Playground
+# This uses Selenium to verify plugin activation
+```
+
+#### 2. WordPress Plugin Check
+
+Run the official WordPress Plugin Check tool:
+
+```bash
+# Start Docker environment
+docker-compose up -d
+
+# Plugin will be automatically checked during generation
+# Or manually run: docker-compose exec wordpress wp plugin check <plugin-slug>
+```
+
+#### 3. PHPUnit Testing
+
+Generate and run unit tests:
+
+```bash
+# Generator can create PHPUnit bootstrap files
+# Tests run automatically in Docker environment
 ```
 
 ### Adding New Tools
