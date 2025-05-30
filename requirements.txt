@@ -1,7 +1,24 @@
-openai>=1.75.0
+# Core OpenAI Agents SDK
 openai-agents>=0.0.11
-loguru>=0.7.3
+
+# Logging
+loguru>=0.7.0
+
+# Environment variables
 python-dotenv>=1.0.0
+
+# Type hints support (for older Python versions)
+typing-extensions>=4.0.0
+
+# Async support enhancements
+asyncio>=3.4.3
+
+# Path handling (usually built-in, but good to specify)
+pathlib>=1.0.1
+
+# Testing tools
+selenium>=4.0.0
+webdriver-manager>=4.0.0
 
 # Dev dependencies
 black>=24.2.0
