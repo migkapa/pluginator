@@ -18,7 +18,8 @@ from tools import (
     test_with_playground,
     run_plugin_check,
     run_phpunit_tests,
-    generate_phpunit_bootstrap
+    generate_phpunit_bootstrap,
+    create_plugin_zip
 )
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
@@ -262,9 +263,14 @@ plugin_manager_agent = Agent(
         "       - Print: 'Running PHPUnit tests...'\n"
         "       - Use run_phpunit_tests\n"
         "   - If Docker not available for requested tests, note in report\n\n"
-        "7. **Final Report**:\n"
+        "7. **Plugin Packaging**:\n"
+        "   - Print: 'Creating plugin ZIP file...'\n"
+        "   - Call create_plugin_zip with the plugin slug\n"
+        "   - Include the ZIP file information in the final report\n\n"
+        "8. **Final Report**:\n"
         "   - Summarize the entire process\n"
         "   - Report plugin location: './plugins/<slug>/'\n"
+        "   - Display the ZIP file download information prominently\n"
         "   - List all tests that were run and their results\n"
         "   - Highlight successes and any issues\n"
         "   - If advanced tests were skipped due to missing dependencies, provide instructions\n"
@@ -314,5 +320,7 @@ plugin_manager_agent = Agent(
         run_plugin_check,
         run_phpunit_tests,
         generate_phpunit_bootstrap,
+        # ZIP creation tool
+        create_plugin_zip,
     ]
 )

@@ -722,3 +722,68 @@ class SampleTest extends WP_UnitTestCase {{
     except Exception as e:
         logger.exception(f"Error generating PHPUnit bootstrap for {plugin_slug}")
         return f"Error: {str(e)}"
+
+@function_tool
+def create_plugin_zip(plugin_slug: str) -> str:
+    """Create a ZIP file of the generated plugin.
+    
+    Args:
+        plugin_slug: The plugin slug to create ZIP for
+    """
+    try:
+        import zipfile
+        import datetime
+        
+        # Check if plugin exists
+        plugin_path = Path(f"./plugins/{plugin_slug}")
+        if not plugin_path.exists():
+            return f"Error: Plugin {plugin_slug} not found in ./plugins/"
+        
+        # Create zips directory if it doesn't exist
+        zips_dir = Path("./zips")
+        zips_dir.mkdir(exist_ok=True)
+        
+        # Generate ZIP filename with timestamp
+        timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+        zip_filename = f"{plugin_slug}-{timestamp}.zip"
+        zip_path = zips_dir / zip_filename
+        
+        # Create the ZIP file
+        with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            # Walk through the plugin directory
+            for root, dirs, files in os.walk(plugin_path):
+                # Skip hidden directories and common development files
+                dirs[:] = [d for d in dirs if not d.startswith('.') and d not in ['node_modules', '__pycache__']]
+                
+                for file in files:
+                    # Skip hidden files and common development files
+                    if file.startswith('.') or file.endswith(('.pyc', '.pyo', '.DS_Store')):
+                        continue
+                        
+                    file_path = os.path.join(root, file)
+                    # Calculate the archive name (relative path from plugins directory)
+                    arcname = os.path.relpath(file_path, plugin_path.parent)
+                    zipf.write(file_path, arcname)
+        
+        # Get file size
+        file_size = zip_path.stat().st_size
+        size_mb = file_size / (1024 * 1024)
+        
+        logger.success(f"Created ZIP file: {zip_path} ({size_mb:.2f} MB)")
+        
+        # Return information about the created ZIP
+        return (
+            f"ZIP file created successfully!\n"
+            f"📦 File: {zip_path}\n"
+            f"📊 Size: {size_mb:.2f} MB\n"
+            f"📁 Location: {zip_path.absolute()}\n\n"
+            f"To install this plugin:\n"
+            f"1. Go to WordPress Admin → Plugins → Add New\n"
+            f"2. Click 'Upload Plugin'\n"
+            f"3. Choose the ZIP file: {zip_filename}\n"
+            f"4. Click 'Install Now' and then 'Activate'"
+        )
+        
+    except Exception as e:
+        logger.exception(f"Error creating ZIP file for {plugin_slug}")
+        return f"Error creating ZIP: {str(e)}"

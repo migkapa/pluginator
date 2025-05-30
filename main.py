@@ -103,7 +103,8 @@ async def run_agent(prompt: str, max_retries: int = 3) -> Optional[str]:
     for attempt in range(max_retries):
         try:
             logger.debug(f"Starting agent run (attempt {attempt + 1}/{max_retries})...")
-            response = await Runner.run(manager_agent, prompt)
+            # Increase max_turns to accommodate the additional workflow steps
+            response = await Runner.run(manager_agent, prompt, max_turns=20)
             logger.success("Agent run completed successfully.")
             return response.final_output
         except KeyboardInterrupt:
