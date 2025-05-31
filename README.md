@@ -72,114 +72,119 @@ export OPENAI_API_KEY="your-api-key-here"
 # Or create a .env file with: OPENAI_API_KEY=your-api-key-here
 ```
 
-## 🤖 Model Support (New in v0.0.16)
+## 🤖 Model Support (Enhanced in v0.0.16)
 
-The WordPress Plugin Generator now supports multiple AI models beyond OpenAI, including any model supported by LiteLLM (Anthropic, Google, Groq, Cohere, and many more).
+The WordPress Plugin Generator now supports **any AI model via LiteLLM**, including OpenAI, Anthropic, Google, local Ollama models, and many more providers.
+
+### 🎯 Quick Start Examples
+
+```bash
+# OpenAI models (default, no setup needed)
+python main.py -p "Create a contact form plugin"
+python main.py --model gpt-4o-mini -p "Create a faster plugin"
+
+# Local Ollama models (free, no API key needed)
+python main.py --model ollama/llama3.2:latest -p "Create a plugin"
+python main.py --model ollama/deepseek-r1:14b -p "Create a plugin"
+
+# Anthropic Claude (requires ANTHROPIC_API_KEY)
+python main.py --model claude-3-5-haiku-20241022 -p "Create a plugin"
+
+# Google Gemini (requires GOOGLE_API_KEY)
+python main.py --model litellm/gemini/gemini-1.5-flash -p "Create a plugin"
+
+# Groq (requires GROQ_API_KEY)
+python main.py --model litellm/groq/llama-3.1-70b-versatile -p "Create a plugin"
+```
+
+### 🔍 Discover Available Models
+
+```bash
+# List all supported providers and example models
+python main.py --list-models
+```
 
 ### Default Model
 
 By default, the generator uses OpenAI's `gpt-4o` model, which provides the best balance of capabilities and performance.
 
-### Available Models
+### Supported Providers
 
+| Provider | Models | API Key Required | Notes |
+|----------|--------|------------------|-------|
+| **OpenAI** | gpt-4o, gpt-4o-mini, o1-preview, o1-mini | ✅ OPENAI_API_KEY | Best overall performance |
+| **Ollama** | Any local model | ❌ None | Free, runs locally |
+| **Anthropic** | claude-3-5-sonnet, claude-3-5-haiku | ✅ ANTHROPIC_API_KEY | Excellent for complex tasks |
+| **Google** | gemini-1.5-pro, gemini-1.5-flash | ✅ GOOGLE_API_KEY | Strong multimodal capabilities |
+| **Groq** | llama-3.1-70b, mixtral-8x7b | ✅ GROQ_API_KEY | Ultra-fast inference |
+| **Cohere** | command-r-plus | ✅ COHERE_API_KEY | Good for enterprise |
+
+### 🚀 Setup Instructions
+
+#### OpenAI (Default)
 ```bash
-# List all available model shortcuts and providers
-python main.py --list-models
+export OPENAI_API_KEY="your-openai-key"
+python main.py -p "Create a plugin"
 ```
 
-#### Model Shortcuts (Convenient Aliases)
-
-For convenience, we provide shortcuts for popular models:
-
-**OpenAI Models:**
-- `gpt-4o` (default) - Latest GPT-4 with vision, structured outputs, and tool support
-- `gpt-4o-mini` - Faster and more cost-effective variant
-- `o1-preview` - Advanced reasoning model (fixed temperature)
-- `o1-mini` - Faster reasoning model (fixed temperature)
-
-**Anthropic Models:**
-- `claude-3-5-sonnet` - Latest Claude with strong capabilities
-- `claude-3-5-haiku` - Fast and efficient Claude model
-- `claude-3-opus` - Most capable Claude model
-
-**Google Models:**
-- `gemini-2.0-flash` - Fast Gemini model with good performance
-- `gemini-1.5-pro` - Advanced Gemini model
-- `gemini-1.5-flash` - Balanced Gemini model
-
-**Other Models:**
-- `llama-3.1-70b` - Meta's LLaMA via Groq
-- `mixtral-8x7b` - Mistral model via Groq
-
-#### Using Any LiteLLM Model
-
-You can use **any model supported by LiteLLM** with the format:
-```
-litellm/provider/model-name
-```
-
-Examples:
+#### Ollama (Local, Free)
 ```bash
-# Anthropic models
---model litellm/anthropic/claude-3-5-sonnet-20241022
---model litellm/anthropic/claude-3-haiku-20240307
-
-# Google models  
---model litellm/gemini/gemini-2.0-flash-exp
---model litellm/gemini/gemini-1.5-pro
-
-# Groq models
---model litellm/groq/llama-3.1-8b-instant
---model litellm/groq/mixtral-8x7b-32768
-
-# Cohere models
---model litellm/cohere/command-r-plus
-
-# And many more providers...
+# Install Ollama from https://ollama.ai
+ollama pull llama3.2:latest
+python main.py --model ollama/llama3.2:latest -p "Create a plugin"
 ```
 
-See all supported providers at: https://docs.litellm.ai/docs/providers
-
-### Using Alternative Models
-
-#### Method 1: Command Line
+#### Anthropic Claude
 ```bash
-# Use shortcuts
-python main.py -p "Create a contact form plugin" --model claude-3-5-sonnet
-python main.py -p "Create a SEO plugin" --model gemini-2.0-flash
-
-# Use any LiteLLM model directly
-python main.py -p "Create a plugin" --model litellm/groq/llama-3.1-70b-versatile
-
-# With custom temperature and tracing disabled
-python main.py -p "Create a plugin" --model claude-3-5-sonnet --temperature 0.5 --disable-tracing
+export ANTHROPIC_API_KEY="your-anthropic-key"
+python main.py --model claude-3-5-haiku-20241022 -p "Create a plugin"
 ```
 
-#### Method 2: Environment Variables
+#### Google Gemini
 ```bash
-# Copy the example environment file
+export GOOGLE_API_KEY="your-google-key"
+python main.py --model litellm/gemini/gemini-1.5-flash -p "Create a plugin"
+```
+
+#### Groq
+```bash
+export GROQ_API_KEY="your-groq-key" 
+python main.py --model litellm/groq/llama-3.1-70b-versatile -p "Create a plugin"
+```
+
+### 📝 Model Selection Methods
+
+#### Method 1: Command Line Flag
+```bash
+python main.py --model MODEL_NAME -p "Your plugin description"
+```
+
+#### Method 2: Environment Variable
+```bash
+# Set in .env file or export
+export DEFAULT_MODEL="ollama/llama3.2:latest"
+python main.py -p "Your plugin description"
+```
+
+#### Method 3: Configuration File
+```bash
+# Copy example and customize
 cp env.example .env
-
-# Edit .env and set:
-# DEFAULT_MODEL=claude-3-5-sonnet
-# ANTHROPIC_API_KEY=your-anthropic-key
-
-# Or use any LiteLLM model:
-# DEFAULT_MODEL=litellm/groq/llama-3.1-70b-versatile
-# GROQ_API_KEY=your-groq-key
+# Edit .env to set DEFAULT_MODEL and API keys
 ```
 
-### API Key Requirements
+### 🔧 Advanced Options
 
-Different models require different API keys:
+```bash
+# Custom temperature
+python main.py --model ollama/llama3.2:latest --temperature 0.3 -p "Create a plugin"
 
-| Provider | Environment Variable | Get API Key | Shortcuts Available |
-|----------|---------------------|-------------|-------------------|
-| OpenAI | `OPENAI_API_KEY` | [platform.openai.com](https://platform.openai.com) | ✓ |
-| Anthropic | `ANTHROPIC_API_KEY` | [console.anthropic.com](https://console.anthropic.com) | ✓ |
-| Google | `GOOGLE_API_KEY` | [makersuite.google.com](https://makersuite.google.com) | ✓ |
-| Groq | `GROQ_API_KEY` | [console.groq.com](https://console.groq.com) | ✓ |
-| Cohere | `COHERE_API_KEY` | [dashboard.cohere.ai](https://dashboard.cohere.ai) | - |
+# Disable tracing for non-OpenAI models  
+python main.py --model claude-3-5-haiku-20241022 --disable-tracing -p "Create a plugin"
+
+# Verbose output to see model interactions
+python main.py --model ollama/deepseek-r1:14b -p "Create a plugin" -v
+```
 
 ### Installing LiteLLM Support (Optional)
 
@@ -189,17 +194,69 @@ To use non-OpenAI models, install the optional LiteLLM dependency:
 pip install "openai-agents[litellm]==0.0.16"
 ```
 
-### Model-Specific Considerations
+### 🎯 Model Recommendations
 
-1. **Structured Outputs**: Some models don't support structured JSON outputs. The generator will handle this gracefully but may occasionally produce invalid JSON with these models.
+| Use Case | Recommended Model | Why |
+|----------|------------------|-----|
+| **Production Plugins** | `gpt-4o` | Most reliable, best code quality |
+| **Fast Prototyping** | `gpt-4o-mini` | Faster, cost-effective |
+| **Local Development** | `ollama/deepseek-r1:14b` | Free, privacy-focused |
+| **Complex Logic** | `claude-3-5-sonnet-20241022` | Excellent reasoning |
+| **Budget-Conscious** | `ollama/llama3.2:latest` | Completely free |
 
-2. **Multimodal Support**: Not all models support image inputs. This doesn't affect the plugin generator as it works with text only.
+### ⚡ Performance Comparison
 
-3. **API Compatibility**: Non-OpenAI models use the Chat Completions API instead of the Responses API.
+| Model | Speed | Quality | Cost | Local |
+|-------|-------|---------|------|-------|
+| gpt-4o | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ | 💰💰💰 | ❌ |
+| gpt-4o-mini | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ | 💰💰 | ❌ |
+| claude-3-5-haiku | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ | 💰💰 | ❌ |
+| ollama/deepseek-r1:14b | ⭐⭐ | ⭐⭐⭐ | 🆓 | ✅ |
+| ollama/llama3.2 | ⭐⭐⭐ | ⭐⭐⭐ | 🆓 | ✅ |
 
-4. **Tracing**: When using non-OpenAI models, you may want to disable tracing with `--disable-tracing` to avoid authentication errors.
+### 🔍 Model Capabilities
 
-5. **Flexibility**: You can use any model name supported by LiteLLM - shortcuts are just for convenience!
+Different models support different features:
+
+- **Structured Outputs**: OpenAI models, some Ollama models
+- **Multimodal**: Most models (though plugin generator uses text only)
+- **Function Calling**: All supported models
+- **JSON Mode**: OpenAI and many Ollama models
+
+### Troubleshooting
+
+#### Common Issues
+
+1. **API Key Errors**
+   ```bash
+   # Check your API keys
+   python main.py --check
+   ```
+
+2. **LiteLLM Not Available**
+   ```bash
+   pip install "openai-agents[litellm]==0.0.16"
+   ```
+
+3. **Ollama Not Running**
+   ```bash
+   # Start Ollama service
+   ollama serve
+   # Pull a model
+   ollama pull llama3.2:latest
+   ```
+
+4. **Model Getting Stuck**
+   - Try a larger model (e.g., deepseek-r1:14b instead of llama3.2)
+   - Increase verbosity: `-v`
+   - Check model-specific limitations
+
+#### Model-Specific Notes
+
+- **Ollama Models**: Some smaller models may struggle with complex multi-agent workflows
+- **Claude Models**: May need `--disable-tracing` to avoid authentication errors
+- **o1 Models**: Have fixed temperature settings
+- **Local Models**: Performance varies significantly by model size
 
 ## Usage
 

@@ -119,35 +119,17 @@ PROVIDER_CONFIGS: Dict[str, ModelConfig] = {
 }
 
 # Convenient shortcuts for common models
-MODEL_SHORTCUTS = {
-    # OpenAI shortcuts
-    "gpt-4o": "gpt-4o",
-    "gpt-4o-mini": "gpt-4o-mini", 
-    "o1-preview": "o1-preview",
-    "o1-mini": "o1-mini",
-    
-    # Anthropic shortcuts
-    "claude-3-5-sonnet": "litellm/anthropic/claude-3-5-sonnet-20241022",
-    "claude-3-5-haiku": "litellm/anthropic/claude-3-5-haiku-20241022",
-    "claude-3-opus": "litellm/anthropic/claude-3-opus-20240229",
-    
-    # Google shortcuts  
-    "gemini-2.0-flash": "litellm/gemini/gemini-2.0-flash-exp",
-    "gemini-1.5-pro": "litellm/gemini/gemini-1.5-pro",
-    "gemini-1.5-flash": "litellm/gemini/gemini-1.5-flash",
-    
-    # Groq shortcuts
-    "llama-3.1-70b": "litellm/groq/llama-3.1-70b-versatile",
-    "mixtral-8x7b": "litellm/groq/mixtral-8x7b-32768",
-    
-    # Ollama shortcuts (local models)
-    "llama3.2": "litellm/ollama_chat/llama3.2:latest",
-    "llama3.1": "litellm/ollama_chat/llama3.1:latest", 
-    "llama3": "litellm/ollama_chat/llama3:latest",
-    "codellama": "litellm/ollama_chat/codellama:latest",
-    "mistral": "litellm/ollama_chat/mistral:latest",
-    "qwen2.5": "litellm/ollama_chat/qwen2.5:latest",
-}
+# No hardcoded shortcuts - users should use the flexible LiteLLM format:
+# - OpenAI models: gpt-4o, gpt-4o-mini, o1-preview, etc.
+# - LiteLLM format: litellm/provider/model-name
+# - Direct provider format: ollama/model-name, anthropic/model-name (if supported)
+# 
+# Examples:
+# - gpt-4o
+# - litellm/anthropic/claude-3-5-sonnet-20241022
+# - litellm/groq/llama-3.1-70b-versatile  
+# - ollama/llama3.2:latest
+MODEL_SHORTCUTS = {}
 
 
 class ModelManager:
@@ -172,16 +154,8 @@ class ModelManager:
                 logger.info("Using Chat Completions API by default")
     
     def resolve_model_name(self, model_name: Optional[str] = None) -> str:
-        """Resolve model name from shortcuts or return as-is."""
-        name = model_name or self.current_model
-        
-        # Check if it's a shortcut
-        if name in MODEL_SHORTCUTS:
-            resolved = MODEL_SHORTCUTS[name]
-            logger.debug(f"Resolved model shortcut '{name}' to '{resolved}'")
-            return resolved
-        
-        return name
+        """Return model name as-is - no shortcuts, full flexibility."""
+        return model_name or self.current_model
     
     def get_provider_from_model(self, model_name: str) -> str:
         """Extract provider name from model string."""
@@ -205,6 +179,14 @@ class ModelManager:
                 }
                 return provider_mapping.get(provider, provider)
             return "litellm"
+        
+        # Check if it's a direct ollama/ model
+        if resolved_name.startswith("ollama/"):
+            return "ollama"
+        
+        # Check if it's a Claude model (Anthropic)
+        if resolved_name.startswith("claude-"):
+            return "anthropic"
         
         # Check if it's a known OpenAI model pattern
         openai_models = ["gpt-", "o1-", "text-", "davinci", "curie", "babbage", "ada"]
@@ -234,27 +216,35 @@ class ModelManager:
         """Create a model instance for use with agents."""
         resolved_name = self.resolve_model_name(model_name)
         config = self.get_model_config(resolved_name)
+        provider = self.get_provider_from_model(resolved_name)
         
         # Use provided temperature or model's default
         temp = temperature if temperature is not None else config.default_temperature
         
-        # For LiteLLM models
-        if resolved_name.startswith("litellm/"):
+        # For LiteLLM models (including direct ollama/ format and Claude models)
+        if (resolved_name.startswith("litellm/") or 
+            resolved_name.startswith("ollama/") or 
+            provider != "openai"):
+            
             if not LITELLM_AVAILABLE:
                 raise ImportError(
                     "LiteLLM extension not available. Install with: pip install 'openai-agents[litellm]'"
                 )
             
-            # Get API key from parameter or environment
+            # Get API key from parameter or environment (if required)
             if not api_key and config.api_key_env_var:
                 api_key = os.getenv(config.api_key_env_var)
             
-            if not api_key:
-                provider = self.get_provider_from_model(resolved_name)
+            # Check if API key is required for this provider
+            if config.api_key_env_var and not api_key:
                 raise ValueError(
                     f"API key required for {provider}. Set {config.api_key_env_var} "
                     f"environment variable or pass api_key parameter."
                 )
+            
+            # For Ollama, we don't need an API key, just pass a dummy one
+            if provider == "ollama":
+                api_key = "dummy-key"  # Ollama doesn't use API keys
             
             # Return LitellmModel instance
             return LitellmModel(model=resolved_name, api_key=api_key)
@@ -279,26 +269,48 @@ class ModelManager:
         return ModelSettings(temperature=temp)
     
     def list_available_models(self) -> List[Dict[str, Any]]:
-        """List available model shortcuts and provider information."""
-        models = []
+        """List supported providers with example model names."""
+        examples = []
         
-        # Add shortcuts
-        for shortcut, full_name in MODEL_SHORTCUTS.items():
-            provider = self.get_provider_from_model(full_name)
-            config = self.get_model_config(full_name)
+        # Add provider examples
+        provider_examples = {
+            "openai": ["gpt-4o", "gpt-4o-mini", "o1-preview", "o1-mini"],
+            "anthropic": [
+                "litellm/anthropic/claude-3-5-sonnet-20241022",
+                "litellm/anthropic/claude-3-5-haiku-20241022",
+                "litellm/anthropic/claude-3-opus-20240229"
+            ],
+            "google": [
+                "litellm/gemini/gemini-2.0-flash-exp",
+                "litellm/gemini/gemini-1.5-pro",
+                "litellm/gemini/gemini-1.5-flash"
+            ],
+            "groq": [
+                "litellm/groq/llama-3.1-70b-versatile",
+                "litellm/groq/mixtral-8x7b-32768"
+            ],
+            "ollama": [
+                "ollama/llama3.2:latest",
+                "ollama/llama3.1:latest",
+                "ollama/codellama:latest"
+            ]
+        }
+        
+        for provider, model_list in provider_examples.items():
+            config = PROVIDER_CONFIGS.get(provider, PROVIDER_CONFIGS["openai"])
             
-            models.append({
-                "shortcut": shortcut,
-                "full_name": full_name,
-                "provider": provider,
-                "supports_responses_api": config.supports_responses_api,
-                "supports_structured_outputs": config.supports_structured_outputs,
-                "supports_multimodal": config.supports_multimodal,
-                "supports_tools": config.supports_tools,
-                "notes": config.notes or ""
-            })
+            for model_name in model_list:
+                examples.append({
+                    "provider": provider,
+                    "example_model": model_name,
+                    "supports_responses_api": config.supports_responses_api,
+                    "supports_structured_outputs": config.supports_structured_outputs,
+                    "supports_multimodal": config.supports_multimodal,
+                    "supports_tools": config.supports_tools,
+                    "notes": config.notes or ""
+                })
         
-        return sorted(models, key=lambda x: (x["provider"], x["shortcut"]))
+        return sorted(examples, key=lambda x: (x["provider"], x["example_model"]))
     
     def get_supported_providers(self) -> List[Dict[str, Any]]:
         """Get list of supported providers with their capabilities."""
@@ -330,7 +342,7 @@ class ModelManager:
         return results
     
     def suggest_models_for_provider(self, provider: str) -> List[str]:
-        """Suggest model names for a given provider."""
+        """Suggest example model names for a given provider."""
         suggestions = {
             "anthropic": [
                 "litellm/anthropic/claude-3-5-sonnet-20241022",
@@ -353,11 +365,9 @@ class ModelManager:
                 "litellm/groq/mixtral-8x7b-32768"
             ],
             "ollama": [
-                "litellm/ollama_chat/llama3.2:latest",
-                "litellm/ollama_chat/llama3.1:latest",
-                "litellm/ollama_chat/codellama:latest",
-                "litellm/ollama_chat/mistral:latest",
-                "litellm/ollama_chat/qwen2.5:latest"
+                "ollama/llama3.2:latest",
+                "ollama/llama3.1:latest",
+                "ollama/codellama:latest"
             ]
         }
         

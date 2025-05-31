@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Optional
 
 # Imports
-from plugin_agents import plugin_manager_agent as manager_agent
+from plugin_agents import get_plugin_manager_agent
 from models import model_manager
 from loguru import logger
 
@@ -119,6 +119,8 @@ async def run_agent(prompt: str, max_retries: int = 3) -> Optional[str]:
     for attempt in range(max_retries):
         try:
             logger.debug(f"Starting agent run (attempt {attempt + 1}/{max_retries})...")
+            # Create agent with current model configuration
+            manager_agent = get_plugin_manager_agent()
             # Increase max_turns to accommodate the additional workflow steps
             response = await Runner.run(manager_agent, prompt, max_turns=20)
             logger.success("Agent run completed successfully.")
@@ -251,8 +253,8 @@ Examples:
     if args.list_models:
         logger.info("=== Available Models ===\n")
         
-        # Show shortcuts
-        logger.info("📝 Model Shortcuts (convenient aliases):")
+        # Show examples
+        logger.info("📝 Model Examples (use any model supported by LiteLLM):")
         models = model_manager.list_available_models()
         
         # Group by provider
@@ -275,7 +277,7 @@ Examples:
                     features.append("tools")
                 
                 feature_str = f" [{', '.join(features)}]" if features else ""
-                logger.info(f"    • {model['shortcut']} → {model['full_name']}{feature_str}")
+                logger.info(f"    • {model['example_model']}{feature_str}")
         
         # Show providers and capabilities
         logger.info("\n📦 Supported Providers:")
@@ -299,12 +301,15 @@ Examples:
         
         # Show how to use any LiteLLM model
         logger.info("\n🚀 Using Any LiteLLM Model:")
-        logger.info("You can use any model supported by LiteLLM with the format:")
-        logger.info("  litellm/provider/model-name")
+        logger.info("You can use any model supported by LiteLLM with these formats:")
+        logger.info("  1. OpenAI models directly: gpt-4o, gpt-4o-mini, o1-preview")
+        logger.info("  2. LiteLLM format: litellm/provider/model-name")
+        logger.info("  3. Provider format: ollama/model-name")
         logger.info("\nExamples:")
+        logger.info("  --model gpt-4o")
         logger.info("  --model litellm/anthropic/claude-3-5-sonnet-20241022")
         logger.info("  --model litellm/groq/llama-3.1-8b-instant")
-        logger.info("  --model litellm/cohere/command-r-plus")
+        logger.info("  --model ollama/llama3.2:latest")
         logger.info("\nSee all providers: https://docs.litellm.ai/docs/providers")
         
         # Show API key status
