@@ -1,4 +1,5 @@
 from agents import Agent, ModelSettings
+from models import model_manager
 from tools import (
     write_file,
     read_file,
@@ -23,8 +24,6 @@ from tools import (
 )
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
-
-general_agent_model = "gpt-4o"
 
 # Enhanced Pydantic models for structured inputs/outputs
 class PluginSpec(BaseModel):
@@ -84,8 +83,8 @@ plugin_spec_agent = Agent(
         "Output a complete PluginSpec object with all fields properly filled."
     ),
     output_type=PluginSpec,
-    model=general_agent_model,
-    model_settings=ModelSettings(temperature=0.3)
+    model=model_manager.current_model,
+    model_settings=model_manager.get_model_settings(temperature=0.3)
 )
 
 # 2. Enhanced agent to generate plugin files with better structure
@@ -125,8 +124,8 @@ file_generator_agent = Agent(
         "Output ONLY a JSON array of PluginFile objects, no explanations."
     ),
     output_type=List[PluginFile],
-    model=general_agent_model,
-    model_settings=ModelSettings(temperature=0.2)
+    model=model_manager.current_model,
+    model_settings=model_manager.get_model_settings(temperature=0.2)
 )
 
 # 3. Enhanced compliance agent with detailed checking
@@ -165,8 +164,8 @@ compliance_agent = Agent(
         "Include a summary count of issues by severity."
     ),
     output_type=ComplianceReport,
-    model=general_agent_model,
-    model_settings=ModelSettings(temperature=0.1)
+    model=model_manager.current_model,
+    model_settings=model_manager.get_model_settings(temperature=0.1)
 )
 
 # 4. Enhanced testing agent with syntax checking
@@ -201,8 +200,8 @@ testing_agent = Agent(
         "Complete your analysis within 5 turns maximum."
     ),
     output_type=TestReport,
-    model=general_agent_model,
-    model_settings=ModelSettings(temperature=0.1)
+    model=model_manager.current_model,
+    model_settings=model_manager.get_model_settings(temperature=0.1)
 )
 
 # 5. Enhanced plugin manager with better orchestration
@@ -280,8 +279,8 @@ plugin_manager_agent = Agent(
         "Complete the entire workflow efficiently without getting stuck in loops.\n"
         "If any step fails after 2 attempts, move to the next step and report the issue."
     ),
-    model=general_agent_model,
-    model_settings=ModelSettings(temperature=0.1),
+    model=model_manager.current_model,
+    model_settings=model_manager.get_model_settings(temperature=0.1),
     tools=[
         # Logging tools
         log_planning,

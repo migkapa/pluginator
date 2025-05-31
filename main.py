@@ -7,6 +7,7 @@ from typing import Optional
 
 # Imports
 from plugin_agents import plugin_manager_agent as manager_agent
+from models import model_manager
 from loguru import logger
 
 # Try to load .env file if exists
@@ -56,9 +57,24 @@ def validate_environment() -> tuple[bool, list[str]]:
     """Validate the environment setup and return status with issues."""
     issues = []
     
-    # Check API key
-    if not os.environ.get("OPENAI_API_KEY"):
-        issues.append("OPENAI_API_KEY not set. Please export your OpenAI API key.")
+    # Check API key based on selected model
+    current_model = model_manager.current_model
+    resolved_name = model_manager.resolve_model_name(current_model)
+    provider = model_manager.get_provider_from_model(resolved_name)
+    model_config = model_manager.get_model_config(resolved_name)
+    
+    # Check for appropriate API key
+    if model_config.api_key_env_var:
+        if not os.environ.get(model_config.api_key_env_var):
+            provider_name = provider.upper()
+            issues.append(
+                f"{model_config.api_key_env_var} not set. Please export your {provider_name} API key "
+                f"or set a different model with --model."
+            )
+    elif provider == "openai":
+        # Default OpenAI check for models without explicit API key config
+        if not os.environ.get("OPENAI_API_KEY"):
+            issues.append("OPENAI_API_KEY not set. Please export your OpenAI API key.")
     
     # Check if plugins directory exists
     plugins_dir = Path("./plugins")
@@ -131,6 +147,14 @@ Examples:
   %(prog)s -p "Create a contact form plugin"  # Direct prompt
   %(prog)s -p "SEO plugin" -v       # Verbose output
   %(prog)s --check                  # Check environment setup
+  %(prog)s --list-models            # List available AI models
+  
+  # Using different models (optional)
+  %(prog)s -p "Plugin description" --model gpt-4o-mini     # Use GPT-4o mini
+  %(prog)s -p "Plugin description" --model claude-3-5-sonnet --disable-tracing
+  %(prog)s -p "Plugin description" --model gemini-2.5-flash --temperature 0.5
+  
+  # Advanced testing
   %(prog)s -p "Plugin description" --playground  # Test with WordPress Playground
   %(prog)s -p "Plugin description" --wp-check    # Run WordPress Plugin Check
   %(prog)s -p "Plugin description" --phpunit     # Generate and run PHPUnit tests
@@ -183,10 +207,114 @@ Examples:
         action="store_true"
     )
     
+    # Model configuration options
+    model_group = parser.add_argument_group('Model Configuration (Optional)')
+    model_group.add_argument(
+        "--model",
+        help="Model to use (default: gpt-4o). Examples: gpt-4o-mini, claude-3-5-sonnet, gemini-2.5-flash",
+        type=str,
+        default=None
+    )
+    model_group.add_argument(
+        "--list-models",
+        help="List all available models and exit",
+        action="store_true"
+    )
+    model_group.add_argument(
+        "--temperature",
+        help="Model temperature (0.0-2.0, default varies by model)",
+        type=float,
+        default=None
+    )
+    model_group.add_argument(
+        "--disable-tracing",
+        help="Disable tracing (useful for non-OpenAI models)",
+        action="store_true"
+    )
+    
     args = parser.parse_args()
     
     # Setup logging
     setup_logging(args.verbose)
+    
+    # Handle model configuration
+    if args.disable_tracing:
+        os.environ["DISABLE_TRACING"] = "true"
+        logger.debug("Tracing disabled via CLI flag")
+    
+    if args.model:
+        os.environ["DEFAULT_MODEL"] = args.model
+        model_manager.current_model = args.model
+        logger.info(f"Using model: {args.model}")
+    
+    # Handle --list-models
+    if args.list_models:
+        logger.info("=== Available Models ===\n")
+        
+        # Show shortcuts
+        logger.info("📝 Model Shortcuts (convenient aliases):")
+        models = model_manager.list_available_models()
+        
+        # Group by provider
+        by_provider = {}
+        for model in models:
+            provider = model["provider"]
+            if provider not in by_provider:
+                by_provider[provider] = []
+            by_provider[provider].append(model)
+        
+        for provider, provider_models in sorted(by_provider.items()):
+            logger.info(f"  {provider.upper()}:")
+            for model in provider_models:
+                features = []
+                if model["supports_structured_outputs"]:
+                    features.append("structured")
+                if model["supports_multimodal"]:
+                    features.append("multimodal")
+                if model["supports_tools"]:
+                    features.append("tools")
+                
+                feature_str = f" [{', '.join(features)}]" if features else ""
+                logger.info(f"    • {model['shortcut']} → {model['full_name']}{feature_str}")
+        
+        # Show providers and capabilities
+        logger.info("\n📦 Supported Providers:")
+        providers = model_manager.get_supported_providers()
+        for provider in providers:
+            features = []
+            if provider["supports_responses_api"]:
+                features.append("responses-api")
+            if provider["supports_structured_outputs"]:
+                features.append("structured")
+            if provider["supports_multimodal"]:
+                features.append("multimodal")
+            if provider["supports_tools"]:
+                features.append("tools")
+            
+            feature_str = f" [{', '.join(features)}]" if features else ""
+            api_key = f" (API key: {provider['api_key_env_var']})" if provider['api_key_env_var'] else ""
+            logger.info(f"  • {provider['name']}{feature_str}{api_key}")
+            if provider['notes']:
+                logger.info(f"    {provider['notes']}")
+        
+        # Show how to use any LiteLLM model
+        logger.info("\n🚀 Using Any LiteLLM Model:")
+        logger.info("You can use any model supported by LiteLLM with the format:")
+        logger.info("  litellm/provider/model-name")
+        logger.info("\nExamples:")
+        logger.info("  --model litellm/anthropic/claude-3-5-sonnet-20241022")
+        logger.info("  --model litellm/groq/llama-3.1-8b-instant")
+        logger.info("  --model litellm/cohere/command-r-plus")
+        logger.info("\nSee all providers: https://docs.litellm.ai/docs/providers")
+        
+        # Show API key status
+        logger.info("\n🔑 API Key Status:")
+        api_keys = model_manager.validate_api_keys()
+        for provider, available in api_keys.items():
+            status = "✓ Available" if available else "✗ Not set"
+            logger.info(f"  {provider.capitalize()}: {status}")
+        
+        sys.exit(0)
     
     # Environment check
     valid, issues = validate_environment()
