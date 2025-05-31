@@ -2,75 +2,128 @@
 
 An advanced WordPress plugin generator that uses OpenAI's Agents SDK to create production-ready plugins through an intelligent multi-agent workflow.
 
-## Features
+## Table of Contents
 
-### 🚀 Enhanced Capabilities
+- [Features](#-features)
+- [What's New in v0.0.16](#-whats-new-in-v0016)
+- [Quick Start](#-quick-start)
+- [Model Support](#-model-support-enhanced-in-v0016)
+- [Installation](#-installation)
+- [Usage](#usage)
+- [Examples](#examples)
+- [Configuration](#configuration)
+- [Contributing](#contributing)
+- [License](#license)
 
-- **Multi-Agent Architecture**: Specialized agents for specification gathering, code generation, compliance checking, and testing
-- **Production-Ready Code**: Generates complete WordPress plugins following coding standards and best practices
-- **Comprehensive File Operations**: Enhanced file handling with proper error management and directory operations
-- **Compliance Checking**: Automated verification of WordPress coding standards and plugin guidelines
-- **Syntax Validation**: PHP syntax checking when PHP CLI is available
-- **Smart Retry Logic**: Automatic retry on failures with exponential backoff
-- **Verbose Logging**: Detailed logging options for debugging and monitoring
+## ✨ Features
 
-### 📁 Generated Plugin Structure
+- **Multi-Agent Architecture**: Specialized AI agents for different aspects of plugin development
+- **Complete Plugin Generation**: Creates all necessary files, including PHP, CSS, JS, and documentation
+- **WordPress Standards Compliant**: Follows WordPress coding standards and best practices
+- **Interactive Development**: Built-in testing and refinement capabilities
+- **Production Ready**: Generates plugins that can be immediately deployed
+- **Flexible AI Models**: Support for OpenAI, Anthropic Claude, Google Gemini, local Ollama models, and more
 
-```
-plugins/
-└── your-plugin-slug/
-    ├── your-plugin-slug.php      # Main plugin file
-    ├── readme.txt                 # WordPress readme
-    ├── includes/                  # Core functionality
-    │   ├── class-plugin-admin.php
-    │   └── class-plugin-public.php
-    ├── admin/                     # Admin assets
-    │   ├── css/
-    │   └── js/
-    ├── public/                    # Frontend assets
-    │   ├── css/
-    │   └── js/
-    └── languages/                 # Translations
-        └── plugin.pot
-```
+## 🆕 What's New in v0.0.16
 
-## Prerequisites
+### 🚀 **Multi-Model AI Support**
+- **Any LiteLLM Model**: Use OpenAI, Anthropic, Google, Groq, Cohere, and 20+ other providers
+- **Local Ollama Support**: Run completely free models locally (deepseek-r1, llama3.2, etc.)
+- **Flexible Model Selection**: No hardcoded restrictions - use any model with simple format
+- **Smart Provider Detection**: Automatically detects and configures model providers
 
-### Required
+### 🔧 **Enhanced CLI**
+- **New Flags**: `--model`, `--list-models`, `--temperature`, `--disable-tracing`
+- **Better Discovery**: `--list-models` shows all supported providers and examples
+- **Environment Config**: Set default models and API keys in `.env` file
 
-- Python 3.9+
-- OpenAI API key
-- `pip` package manager
+### 📚 **Improved Documentation**
+- **[Quick Start Guide](QUICKSTART.md)**: Step-by-step setup for each AI provider
+- **Provider Comparison**: Performance, cost, and capability tables
+- **Troubleshooting**: Common issues and solutions for each provider
 
-### Optional (Enhanced Features)
-
-- **Docker & Docker Compose**: For real WordPress environment testing
-- **PHP CLI**: For syntax validation of generated code
-
-## Installation
-
-1. Clone the repository:
+### 🔄 **Migration from v0.0.11**
 ```bash
-git clone https://github.com/yourusername/pluginator.git
-cd pluginator
+# Update your installation
+pip install "openai-agents[litellm]==0.0.16"
+
+# Your existing usage still works
+python main.py -p "Create a plugin"
+
+# New: Try different models
+python main.py --model claude-3-5-haiku-20241022 -p "Create a plugin"
+python main.py --model ollama/deepseek-r1:14b -p "Create a plugin"  # Free!
 ```
 
-2. Create and activate a virtual environment:
+## 🤖 Model Support (Enhanced in v0.0.16)
+
+The WordPress Plugin Generator supports **any AI model via LiteLLM**, including OpenAI, Anthropic, Google, local Ollama models, and many more providers.
+
+### Default Model
+
+By default, the generator uses OpenAI's `gpt-4o` model, which provides the best balance of capabilities and performance.
+
+### Supported Providers
+
+| Provider | Example Models | API Key Required | Notes |
+|----------|---------------|------------------|-------|
+| **OpenAI** | gpt-4o, gpt-4o-mini, o1-preview | ✅ OPENAI_API_KEY | Best overall performance |
+| **Ollama** | ollama/llama3.2:latest, ollama/deepseek-r1:14b | ❌ None | Free, runs locally |
+| **Anthropic** | claude-3-5-sonnet, claude-3-5-haiku | ✅ ANTHROPIC_API_KEY | Excellent for complex tasks |
+| **Google** | litellm/gemini/gemini-1.5-flash | ✅ GOOGLE_API_KEY | Strong multimodal capabilities |
+| **Groq** | litellm/groq/llama-3.1-70b-versatile | ✅ GROQ_API_KEY | Ultra-fast inference |
+
+### Quick Model Examples
+
 ```bash
-python -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+# List all available models and providers
+python main.py --list-models
+
+# OpenAI (default) - best reliability
+python main.py --model gpt-4o -p "Create a plugin"
+
+# Ollama (free) - privacy-focused local models
+python main.py --model ollama/deepseek-r1:14b -p "Create a plugin"
+
+# Claude (premium) - excellent for complex logic
+python main.py --model claude-3-5-haiku-20241022 --disable-tracing -p "Create a plugin"
+
+# Custom temperature for different creativity levels
+python main.py --model gpt-4o --temperature 0.3 -p "Create a precise plugin"
 ```
 
-3. Install dependencies:
+**📖 Full Setup Guide:** For detailed installation and configuration instructions for each provider, see the **[Quick Start Guide](QUICKSTART.md)**.
+
+### Installing LiteLLM Support
+
+To use non-OpenAI models, install the optional LiteLLM dependency:
+
 ```bash
-pip install -r requirements.txt
+pip install "openai-agents[litellm]==0.0.16"
 ```
 
-4. Set up your OpenAI API key:
+## 🚀 Quick Start
+
+### 🎯 New to AI Models? Start Here!
+
+For detailed setup instructions for all AI providers (OpenAI, Ollama, Claude, etc.), see our **[📖 Quick Start Guide](QUICKSTART.md)**.
+
+### Basic Usage
 ```bash
-export OPENAI_API_KEY="your-api-key-here"
-# Or create a .env file with: OPENAI_API_KEY=your-api-key-here
+# Default OpenAI usage (requires OPENAI_API_KEY)
+python main.py -p "Create a contact form plugin with name, email, and message fields"
+
+# Try alternative models - see QUICKSTART.md for full setup
+python main.py --model ollama/deepseek-r1:14b -p "Create a plugin"  # Free local model
+python main.py --model claude-3-5-haiku-20241022 -p "Create a plugin"  # High-quality Claude  
+python main.py --model gpt-4o-mini -p "Create a plugin"  # Fast OpenAI model
+
+# Discover all available models
+python main.py --list-models
 ```
+
+**🔗 For complete setup instructions:** See **[📖 Quick Start Guide](QUICKSTART.md)**  
+**🎯 For real-world examples:** See **[📖 Examples & Use Cases](EXAMPLES.md)**
 
 ## Usage
 
@@ -89,8 +142,17 @@ python main.py -p "Create a contact form plugin with email notifications"
 # Generate with verbose output
 python main.py -p "SEO optimization plugin" -v
 
+# Use a different model
+python main.py -p "Custom post type plugin" --model claude-3-5-sonnet
+
+# Use any LiteLLM model with custom settings
+python main.py -p "Plugin description" --model litellm/groq/llama-3.1-70b-versatile --temperature 0.3
+
 # Check environment setup
 python main.py --check
+
+# List all available models and shortcuts
+python main.py --list-models
 
 # Custom retry attempts
 python main.py -p "Custom post type plugin" --max-retries 5
@@ -364,3 +426,58 @@ MIT License - See LICENSE file for details
 - Built with [OpenAI Agents SDK](https://github.com/openai/openai-agents-python)
 - WordPress coding standards and best practices
 - Community feedback and contributions
+
+## 📦 Installation
+
+### Prerequisites
+
+- Python 3.9+
+- An API key for your chosen AI provider (see [Quick Start Guide](QUICKSTART.md))
+
+### Quick Install
+
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/pluginator.git
+cd pluginator
+
+# Create and activate virtual environment
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+
+# Install with LiteLLM support for all models
+pip install "openai-agents[litellm]==0.0.16"
+
+# Install other dependencies
+pip install -r requirements.txt
+
+# Set up environment (copy and edit)
+cp env.example .env
+# Edit .env with your API keys and model preferences
+```
+
+### OpenAI-Only Installation (Smaller)
+
+If you only plan to use OpenAI models:
+
+```bash
+pip install openai-agents==0.0.16
+pip install -r requirements.txt
+export OPENAI_API_KEY="your-api-key-here"
+```
+
+### Optional Enhancements
+
+- **Docker & Docker Compose**: For testing plugins in real WordPress environments
+- **PHP CLI**: For syntax validation of generated code
+- **Ollama**: For free local AI models (see [Quick Start Guide](QUICKSTART.md))
+
+### Verify Installation
+
+```bash
+# Check that everything is working
+python main.py --list-models
+
+# Test with a simple plugin
+python main.py -p "Create a simple hello world widget plugin"
+```

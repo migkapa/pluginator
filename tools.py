@@ -771,17 +771,21 @@ def create_plugin_zip(plugin_slug: str) -> str:
         
         logger.success(f"Created ZIP file: {zip_path} ({size_mb:.2f} MB)")
         
-        # Return information about the created ZIP
+        # Return information about the created ZIP with proper download link
         return (
-            f"ZIP file created successfully!\n"
-            f"📦 File: {zip_path}\n"
-            f"📊 Size: {size_mb:.2f} MB\n"
-            f"📁 Location: {zip_path.absolute()}\n\n"
-            f"To install this plugin:\n"
-            f"1. Go to WordPress Admin → Plugins → Add New\n"
-            f"2. Click 'Upload Plugin'\n"
-            f"3. Choose the ZIP file: {zip_filename}\n"
-            f"4. Click 'Install Now' and then 'Activate'"
+            f"ZIP file created successfully!\n\n"
+            f"📦 **[Get Zip](file://{zip_path.absolute()})** ({size_mb:.2f} MB)\n\n"
+            f"**Direct Path:** `{zip_path}`\n\n"
+            f"**Installation Instructions:**\n"
+            f"1. Download the ZIP file above\n"
+            f"2. Go to WordPress Admin → Plugins → Add New\n"
+            f"3. Click 'Upload Plugin'\n"
+            f"4. Choose the downloaded ZIP file\n"
+            f"5. Click 'Install Now' and then 'Activate'\n\n"
+            f"**File Details:**\n"
+            f"- File: {zip_filename}\n"
+            f"- Location: {zip_path.absolute()}\n"
+            f"- Size: {size_mb:.2f} MB"
         )
         
     except Exception as e:

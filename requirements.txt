@@ -1,5 +1,7 @@
 # Core OpenAI Agents SDK
-openai-agents>=0.0.11
+openai-agents==0.0.16
+# Optional: For non-OpenAI model support
+# Install with: pip install "openai-agents[litellm]==0.0.16"
 
 # Logging
 loguru>=0.7.0
