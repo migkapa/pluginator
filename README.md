@@ -17,12 +17,25 @@ An advanced WordPress plugin generator that uses OpenAI's Agents SDK to create p
 
 ## ✨ Features
 
+### 🎯 **Core Capabilities**
 - **Multi-Agent Architecture**: Specialized AI agents for different aspects of plugin development
 - **Complete Plugin Generation**: Creates all necessary files, including PHP, CSS, JS, and documentation
 - **WordPress Standards Compliant**: Follows WordPress coding standards and best practices
-- **Interactive Development**: Built-in testing and refinement capabilities
 - **Production Ready**: Generates plugins that can be immediately deployed
 - **Flexible AI Models**: Support for OpenAI, Anthropic Claude, Google Gemini, local Ollama models, and more
+
+### 🌐 **Web Interface (NEW!)**
+- **Beautiful UI**: Modern Streamlit-based web interface for non-technical users
+- **Real-time Progress**: Live progress tracking with detailed status updates
+- **Model Selection**: Easy switching between AI models and providers
+- **Analytics Dashboard**: Performance metrics and session history
+- **Mobile Support**: Responsive design that works on all devices
+
+### 🔧 **Enhanced CLI**
+- **Interactive Development**: Built-in testing and refinement capabilities
+- **Advanced Testing**: WordPress Playground, Plugin Check, PHPUnit integration
+- **Performance Monitoring**: Built-in analytics and error tracking
+- **Security Validation**: Multi-layer security checks and compliance scanning
 
 ## 🆕 What's New in v0.0.16
 
@@ -103,6 +116,29 @@ pip install "openai-agents[litellm]==0.0.16"
 ```
 
 ## 🚀 Quick Start
+
+### 🌐 **Web UI (Perfect for Non-Technical Users)**
+
+Beautiful, user-friendly web interface for easy plugin generation:
+
+```bash
+# Install web UI dependencies
+pip install streamlit plotly
+
+# Launch the web interface
+python start_ui.py
+```
+
+Then open **http://localhost:8501** in your browser for a beautiful drag-and-drop interface!
+
+**Features:**
+- 🎨 Modern, intuitive interface
+- 📊 Real-time progress tracking  
+- 🎛️ Easy model selection
+- 📥 One-click plugin downloads
+- 📱 Mobile-responsive design
+
+### 🖥️ **CLI (For Developers & Power Users)**
 
 ### 🎯 New to AI Models? Start Here!
 
