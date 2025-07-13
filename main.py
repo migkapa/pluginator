@@ -8,6 +8,8 @@ from typing import Optional
 # Imports
 from plugin_agents import get_plugin_manager_agent
 from models import model_manager
+from context_manager import context_manager, PluginGenerationContext
+from agent_hooks import on_agent_start, on_agent_end, on_error
 from loguru import logger
 
 # Try to load .env file if exists
@@ -114,27 +116,61 @@ def validate_environment() -> tuple[bool, list[str]]:
     
     return len(issues) == 0, issues
 
-async def run_agent(prompt: str, max_retries: int = 3) -> Optional[str]:
-    """Run the agent with retry logic."""
+async def run_agent(prompt: str, max_retries: int = 3, testing_options: Optional[dict] = None) -> Optional[str]:
+    """Run the agent with retry logic and context management."""
+    # Initialize context for this plugin generation session
+    context = context_manager.create_context(
+        current_phase="initialization",
+        model_used=model_manager.current_model,
+        user_preferences=testing_options or {},
+        advanced_tests_requested=[
+            test for test, enabled in (testing_options or {}).items() if enabled
+        ]
+    )
+    
     for attempt in range(max_retries):
         try:
             logger.debug(f"Starting agent run (attempt {attempt + 1}/{max_retries})...")
-            # Create agent with current model configuration
-            manager_agent = get_plugin_manager_agent()
+            context.retry_count = attempt
+            context_manager.update_context(context.session_id, retry_count=attempt)
+            
+            # Trigger agent start hook
+            on_agent_start("Plugin Manager Agent", context)
+            
+            # Create agent with current model configuration and context
+            manager_agent = get_plugin_manager_agent(context)
             # Increase max_turns to accommodate the additional workflow steps
             response = await Runner.run(manager_agent, prompt, max_turns=20)
             logger.success("Agent run completed successfully.")
+            
+            # Trigger agent end hook
+            on_agent_end("Plugin Manager Agent", success=True, context=context)
+            
+            # Mark context as completed
+            context_manager.update_context(context.session_id, current_phase="completed")
             return response.final_output
         except KeyboardInterrupt:
             logger.warning("Process interrupted by user.")
+            on_agent_end("Plugin Manager Agent", success=False, error="Process interrupted by user", context=context)
+            context_manager.update_context(context.session_id, current_phase="interrupted")
             raise
         except Exception as e:
-            logger.error(f"Attempt {attempt + 1} failed: {str(e)}")
+            error_msg = str(e)
+            logger.error(f"Attempt {attempt + 1} failed: {error_msg}")
+            
+            # Trigger error hook
+            on_error("agent_execution", error_msg, "Plugin Manager Agent", context)
+            
+            context.add_error("agent_execution", error_msg)
+            context_manager.update_context(context.session_id)
+            
             if attempt < max_retries - 1:
                 logger.info(f"Retrying in {2 ** attempt} seconds...")
                 await asyncio.sleep(2 ** attempt)
             else:
                 logger.error("All retry attempts exhausted.")
+                on_agent_end("Plugin Manager Agent", success=False, error=error_msg, context=context)
+                context_manager.update_context(context.session_id, current_phase="failed")
                 raise
     return None
 
@@ -398,7 +434,7 @@ Examples:
             
             enhanced_prompt += f"\n\nPlease run the following advanced tests: {', '.join(test_flags)}"
         
-        result = asyncio.run(run_agent(enhanced_prompt, args.max_retries))
+        result = asyncio.run(run_agent(enhanced_prompt, args.max_retries, testing_options))
         if result:
             logger.info("\n=== Generation Report ===")
             print(result)
